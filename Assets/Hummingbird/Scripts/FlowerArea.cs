@@ -58,7 +58,7 @@ public class FlowerArea : MonoBehaviour
 
     private void FindChildFlowers(Transform parent)
     {
-        for (int i = 0; i < parent.ChildCount; i++)
+        for (int i = 0; i < parent.childCount; i++)
         {
             Transform child = parent.GetChild(i);
 

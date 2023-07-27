@@ -4,7 +4,6 @@ using UnityEngine;
 
 
 /// manages a single flower with nectar 
-
 public class Flower : MonoBehaviour
 {
     [Tooltip("The color when the flower is full")]
@@ -25,17 +24,17 @@ public class Flower : MonoBehaviour
 
 
     /// a vector pointing straight out of the flower
-    public Vector3 FlowerUpVector 
+    public Vector3 FlowerUpVector()
     {
-        get 
+        get; 
         {
             return nectarCollider.transform.up; 
         }
     }
 
-    public Vector3 FlowerCenterPosition 
+    public Vector3 FlowerCenterPosition()
     {
-        get 
+        get; 
         {
             return nectarCollider.transform.position; 
         }
@@ -43,9 +42,9 @@ public class Flower : MonoBehaviour
 
     public float NectarAmount { get; private set; }
 
-    public bool HasNectar 
+    public bool HasNectar()
     {
-        get 
+        get; 
         {
             return NectarAmount > 0f; 
         }
