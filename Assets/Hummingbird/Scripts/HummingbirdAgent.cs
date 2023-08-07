@@ -1,94 +1,106 @@
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
 using Unity.MLAgents;
+using Unity.MLAgents.Sensors;
+using UnityEngine;
+using Unity.MLAgents.Actuators;
 
+/// <summary>
+/// A hummingbird Machine Learning Agent
+/// </summary>
 public class HummingbirdAgent : Agent
 {
-    [Tooltip("Force to apply while bird is moving")]
+    [Tooltip("Force to apply when moving")]
     public float moveForce = 2f;
 
     [Tooltip("Speed to pitch up or down")]
-    public float pitchSpeed = 100f; 
+    public float pitchSpeed = 100f;
 
-    [Tooltip("Speed to rotate around up axis")]
+    [Tooltip("Speed to rotate around the up axis")]
     public float yawSpeed = 100f;
 
     [Tooltip("Transform at the tip of the beak")]
-    public Transform beakTip; 
+    public Transform beakTip;
 
     [Tooltip("The agent's camera")]
-    public Camera agentCamera; 
+    public Camera agentCamera;
 
     [Tooltip("Whether this is training mode or gameplay mode")]
-    public bool trainingMode; 
+    public bool trainingMode;
 
-    // rigid body of the agent 
-    new private Rigidbody rigidbody; 
+    // The rigidbody of the agent
+    new private Rigidbody rigidbody;
 
-    // the flower area that the agent is in
+    // The flower area that the agent is in
     private FlowerArea flowerArea;
 
-    // the nearest flower to the agent
+    // The nearest flower to the agent
     private Flower nearestFlower;
 
-    // allows for smoother pitch changes
+    // Allows for smoother pitch changes
     private float smoothPitchChange = 0f;
 
-    // allows for smoother yaw changes
+    // Allows for smoother yaw changes
     private float smoothYawChange = 0f;
 
-    // maximum angle that the bird can pitch up or down
+    // Maximum angle that the bird can pitch up or down
     private const float MaxPitchAngle = 80f;
 
-    // maximum distance from the beak tip to accept nectar collision
+    // Maximum distance from the beak tip to accept nectar collision
     private const float BeakTipRadius = 0.008f;
 
-    // whether the agent is frozen (intentionally not flying)
+    // Whether the agent is frozen (intentionally not flying)
     private bool frozen = false;
 
-    // the amount of nectar the agent has obtained this episode
+    /// <summary>
+    /// The amount of nectar the agent has obtained this episode
+    /// </summary>
     public float NectarObtained { get; private set; }
 
-    // initialize the agent 
-    public override void Initialize() {
-        rigidbody = GetChild<Rigidbody>();
+    /// <summary>
+    /// Initialize the agent
+    /// </summary>
+    public override void Initialize()
+    {
+        rigidbody = GetComponent<Rigidbody>();
         flowerArea = GetComponentInParent<FlowerArea>();
 
-        // if not in training mode, no max step, play forever
-        if (!trainingMode) 
-        {
-            MaxStep = 0;
-        }
+        // If not training mode, no max step, play forever
+        if (!trainingMode) MaxStep = 0;
     }
 
-    // reset the agent when an episode begins
-    public override void OnEpisodeBegin() {
+    /// <summary>
+    /// Reset the agent when an episode begins
+    /// </summary>
+    public override void OnEpisodeBegin()
+    {
         if (trainingMode)
         {
-            // only reset flowers in training when there is one agent per area
-            flowerArea.ResetFlowers(); 
+            // Only reset flowers in training when there is one agent per area
+            flowerArea.ResetFlowers();
         }
 
-        // reset nectar obtained 
+        // Reset nectar obtained
         NectarObtained = 0f;
 
-        // zero out velocities so that movement stops before a new episode begins
+        // Zero out velocities so that movement stops before a new episode begins
         rigidbody.velocity = Vector3.zero;
         rigidbody.angularVelocity = Vector3.zero;
 
-        // default to spawning in front of a flower 
+        // Default to spawning in front of a flower
         bool inFrontOfFlower = true;
-        if (trainingMode) {
-            // 50% of time, spawn in front of flower, 50% of time, spawn randomly
+        if (trainingMode)
+        {
+            // Spawn in front of flower 50% of the time during training
             inFrontOfFlower = UnityEngine.Random.value > .5f;
         }
 
-        // move the agent to a new random position
+        // Move the agent to a new random position
         MoveToSafeRandomPosition(inFrontOfFlower);
 
-        // recalculate nearest flower after it has moved 
-        UpdateNearestFlower(); 
+        // Recalculate the nearest flower now that the agent has moved
+        UpdateNearestFlower();
     }
 
     /// <summary>
@@ -102,13 +114,15 @@ public class HummingbirdAgent : Agent
     /// Index 4: yaw angle (+1 = turn right, -1 = turn left)
     /// </summary>
     /// <param name="vectorAction">The actions to take</param>
-    public override void OnActionReceived(float[] vectorAction)
+    public override void OnActionReceived(ActionBuffers vectorAction)
     {
         // Don't take actions if frozen
         if (frozen) return;
 
+        ActionSegment<float> vectorActionSegment = vectorAction.ContinuousActions;
+
         // Calculate movement vector
-        Vector3 move = new Vector3(vectorAction[0], vectorAction[1], vectorAction[2]);
+        Vector3 move = new Vector3(vectorActionSegment[0], vectorActionSegment[1], vectorActionSegment[2]);
 
         // Add force in the direction of the move vector
         rigidbody.AddForce(move * moveForce);
@@ -117,8 +131,8 @@ public class HummingbirdAgent : Agent
         Vector3 rotationVector = transform.rotation.eulerAngles;
 
         // Calculate pitch and yaw rotation
-        float pitchChange = vectorAction[3];
-        float yawChange = vectorAction[4];
+        float pitchChange = vectorActionSegment[3];
+        float yawChange = vectorActionSegment[4];
 
         // Calculate smooth rotation changes
         smoothPitchChange = Mathf.MoveTowards(smoothPitchChange, pitchChange, 2f * Time.fixedDeltaTime);
@@ -135,7 +149,6 @@ public class HummingbirdAgent : Agent
         // Apply the new rotation
         transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
     }
-
 
     /// <summary>
     /// Collect vector observations from the environment
@@ -179,8 +192,11 @@ public class HummingbirdAgent : Agent
     /// <see cref="OnActionReceived(float[])"/> instead of using the neural network
     /// </summary>
     /// <param name="actionsOut">And output action array</param>
-    public override void Heuristic(float[] actionsOut)
+    public override void Heuristic(in ActionBuffers actionsOut)
     {
+
+        ActionSegment<float> actionsOutSegment = actionsOut.ContinuousActions;
+
         // Create placeholders for all movement/turning
         Vector3 forward = Vector3.zero;
         Vector3 left = Vector3.zero;
@@ -215,11 +231,11 @@ public class HummingbirdAgent : Agent
         Vector3 combined = (forward + left + up).normalized;
 
         // Add the 3 movement values, pitch, and yaw to the actionsOut array
-        actionsOut[0] = combined.x;
-        actionsOut[1] = combined.y;
-        actionsOut[2] = combined.z;
-        actionsOut[3] = pitch;
-        actionsOut[4] = yaw;
+        actionsOutSegment[0] = combined.x;
+        actionsOutSegment[1] = combined.y;
+        actionsOutSegment[2] = combined.z;
+        actionsOutSegment[3] = pitch;
+        actionsOutSegment[4] = yaw;
     }
 
     /// <summary>
@@ -242,59 +258,65 @@ public class HummingbirdAgent : Agent
         rigidbody.WakeUp();
     }
 
-
-    // if in front of flower, also point beak at flower 
-    // param: whether or not to choose a spot in front of a flower 
-    private void MoveToSafeRandomPosition(bool inFrontOfFlower) 
+    /// <summary>
+    /// Move the agent to a safe random position (i.e. does not collide with anything)
+    /// If in front of flower, also point the beak at the flower
+    /// </summary>
+    /// <param name="inFrontOfFlower">Whether to choose a spot in front of a flower</param>
+    private void MoveToSafeRandomPosition(bool inFrontOfFlower)
     {
-        bool safePositionFound = false; 
-        int attemptsRemaining = 100;
-        vector3 potentialPosition = Vector3.zero;
+        bool safePositionFound = false;
+        int attemptsRemaining = 100; // Prevent an infinite loop
+        Vector3 potentialPosition = Vector3.zero;
         Quaternion potentialRotation = new Quaternion();
 
-        // loop until a safe position is found or we run out of attempts
-        while(!safePositionFound && attemptsRemaining > 0) {
+        // Loop until a safe position is found or we run out of attempts
+        while (!safePositionFound && attemptsRemaining > 0)
+        {
             attemptsRemaining--;
-            if (inFrontOfFlower) {
-                // pick a random flower 
+            if (inFrontOfFlower)
+            {
+                // Pick a random flower
                 Flower randomFlower = flowerArea.Flowers[UnityEngine.Random.Range(0, flowerArea.Flowers.Count)];
 
-                // position 10-20 cm in front of the flower
+                // Position 10 to 20 cm in front of the flower
                 float distanceFromFlower = UnityEngine.Random.Range(.1f, .2f);
-                potentialPosition = randomFlower.FlowerCenterPosition + randomFlower.FlowerUpVector * distanceFromFlower;
+                potentialPosition = randomFlower.transform.position + randomFlower.FlowerUpVector * distanceFromFlower;
 
-                // point beak at flower (bird's head is center of transform)
+                // Point beak at flower (bird's head is center of transform)
                 Vector3 toFlower = randomFlower.FlowerCenterPosition - potentialPosition;
                 potentialRotation = Quaternion.LookRotation(toFlower, Vector3.up);
             }
-            else {
-                // pick a random height off the ground 
+            else
+            {
+                // Pick a random height from the ground
                 float height = UnityEngine.Random.Range(1.2f, 2.5f);
 
-                // pick a random radius from the center of the area
+                // Pick a random radius from the center of the area
                 float radius = UnityEngine.Random.Range(2f, 7f);
 
-                // pick a random direction rotated around the y axis
+                // Pick a random direction rotated around the y axis
                 Quaternion direction = Quaternion.Euler(0f, UnityEngine.Random.Range(-180f, 180f), 0f);
 
-                // combine height, radius, and direction to pick a potential position
+                // Combine height, radius, and direction to pick a potential position
                 potentialPosition = flowerArea.transform.position + Vector3.up * height + direction * Vector3.forward * radius;
 
-                // choose and set random starting pitch and yaw 
+                // Choose and set random starting pitch and yaw
                 float pitch = UnityEngine.Random.Range(-60f, 60f);
                 float yaw = UnityEngine.Random.Range(-180f, 180f);
                 potentialRotation = Quaternion.Euler(pitch, yaw, 0f);
             }
 
-            // check to see if the agent will collide with anything
-            Collider[] colliders = Physics.OverlapSphere(potentialPosition, 0.05f); // diameter of 10 cm 
-            safePositionFound = colliders.Length == 0; 
+            // Check to see if the agent will collide with anything
+            Collider[] colliders = Physics.OverlapSphere(potentialPosition, 0.05f);
 
+            // Safe position has been found if no colliders are overlapped
+            safePositionFound = colliders.Length == 0;
         }
 
         Debug.Assert(safePositionFound, "Could not find a safe position to spawn");
 
-        // set position and rotation 
+        // Set the position and rotation
         transform.position = potentialPosition;
         transform.rotation = potentialRotation;
     }
@@ -325,7 +347,6 @@ public class HummingbirdAgent : Agent
             }
         }
     }
-
 
     /// <summary>
     /// Called when the agent's collider enters a trigger collider
