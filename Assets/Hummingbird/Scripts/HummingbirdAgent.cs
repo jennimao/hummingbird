@@ -53,6 +53,8 @@ public class HummingbirdAgent : Agent
     // Whether the agent is frozen (intentionally not flying)
     private bool frozen = false;
 
+    private int counter = 0;
+
     /// <summary>
     /// The amount of nectar the agent has obtained this episode
     /// </summary>
@@ -67,7 +69,8 @@ public class HummingbirdAgent : Agent
         flowerArea = GetComponentInParent<FlowerArea>();
 
         // If not training mode, no max step, play forever
-        if (!trainingMode) MaxStep = 0;
+        if (!trainingMode) MaxStep = 0; 
+        Debug.Log("Initialization begins");
     }
 
     /// <summary>
@@ -381,8 +384,11 @@ public class HummingbirdAgent : Agent
             // Note: a collision with anything but the beak tip should not count
             if (Vector3.Distance(beakTip.position, closestPointToBeakTip) < BeakTipRadius)
             {
+                counter += 1; 
+                Debug.Log("Hello: " + counter.ToString());
                 // Look up the flower for this nectar collider
                 Flower flower = flowerArea.GetFlowerFromNectar(collider);
+                Debug.Log("Flower obtained: " + flower.ToString());
 
                 // Attempt to take .01 nectar
                 // Note: this is per fixed timestep, meaning it happens every .02 seconds, or 50x per second
@@ -390,6 +396,7 @@ public class HummingbirdAgent : Agent
 
                 // Keep track of nectar obtained
                 NectarObtained += nectarReceived;
+                Debug.Log("Nectar obtained");
 
                 if (trainingMode)
                 {

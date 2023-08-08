@@ -66,6 +66,7 @@ public class FlowerArea : MonoBehaviour
 
     private void Start()
     {
+        Debug.Log("Finding Child Flowers");
         // Find all flowers that are children of this GameObject/Transform
         FindChildFlowers(transform);
     }
@@ -76,6 +77,7 @@ public class FlowerArea : MonoBehaviour
     /// <param name="parent">The parent of the children to check</param>
     private void FindChildFlowers(Transform parent)
     {
+
         for (int i = 0; i < parent.childCount; i++)
         {
             Transform child = parent.GetChild(i);
@@ -99,6 +101,7 @@ public class FlowerArea : MonoBehaviour
 
                     // Add the nectar collider to the lookup dictionary
                     nectarFlowerDictionary.Add(flower.nectarCollider, flower);
+                    Debug.Log("Added a flower and collider!");
 
                     // Note: there are no flowers that are children of other flowers
                 }
